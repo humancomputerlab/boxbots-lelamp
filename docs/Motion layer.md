@@ -1,354 +1,137 @@
-# 🔄 LeLamp Workflows Guide
+# Lelamp Studio
 
-**⏱️ Estimated time:** 30-60 minutes per workflow  
-**🔧 Required tools:** Computer with LeLamp runtime, text editor  
-**📦 Required:** LeLamp runtime repository, understanding of Python and JSON
+https://github.com/humancomputerlab/lelamp-studio
 
-## Overview
 
-Workflows in the LeLamp runtime system enable you to create custom AI-powered behaviors for your robot lamp. Workflows help the robot follow a set of instructions sequentially, essentially forming a graph structure that defines how the robot should respond to different situations and execute tasks.
+A web-based visual interface for animating and controlling the Lelamp robot. This React application provides a node-based graph editor to create robot animations, visualize URDF models in 3D, and export motion sequences for the robot lab.
 
-The LeLamp runtime uses LiveKit AI to process these workflows, allowing your robot to intelligently follow complex instruction sequences and interact with its environment.
+## What It Is
 
-## Workflow Structure
+The Lelamp Interface is a browser-based tool for:
+- **3D Robot Visualization**: Load and view URDF robot models with interactive joint manipulation
+- **Node-Based Animation Editor**: Create animation sequences using a visual graph of joint poses and transitions
+- **Animation Playback**: Preview robot movements in real-time before deploying to hardware
+- **CSV Export**: Generate keyframe data files compatible with robot runtime systems
+- **AI-Powered Poses**: Optional integration with Neocortex AI to generate intelligent robot behaviors
 
-Each workflow consists of two essential files:
+## How to Use
 
-1. **`workflow.json`** - Defines the workflow structure, nodes, edges, and execution logic
-2. **`tools.py`** - Contains the Python functions (tools) that the workflow can call during execution
-
-These files must be placed inside a folder named after your workflow (e.g., `my_custom_workflow/`), which is then uploaded to the `workflows/` folder in the LeLamp runtime repository.
-
-## Creating a New Workflow
-
-### Step 1: Create Your Workflow Folder
-
-First, navigate to the LeLamp runtime repository on your computer or Raspberry Pi:
+### Setup
 
 ```bash
-cd lelamp_runtime
-cd workflows
-mkdir my_custom_workflow
-cd my_custom_workflow
+npm i
+npm run dev
 ```
 
-Replace `my_custom_workflow` with your desired workflow name. Use lowercase letters, numbers, and underscores only (e.g., `greeting_workflow`, `dance_sequence`, `interactive_mode`).
+The application will start on `http://localhost:5173` (or your configured port).
 
-### Step 2: Create `workflow.json`
+### Basic Workflow
 
-Create a `workflow.json` file that defines your workflow's graph structure. This file describes:
+1. **Upload Robot Model**
+   - Click "Upload Simulation" in the sidebar
+   - Upload a ZIP file containing:
+     - `robot.URDF` (or similar URDF file)
+     - All associated mesh files (STL, DAE, etc.)
+   - The robot will appear in the 3D viewer with all joints available
 
-- **Nodes**: Individual steps or decision points in your workflow
-- **Edges**: Connections between nodes that define the flow
-- **Tools**: References to functions defined in `tools.py`
-- **Conditions**: Logic that determines which path to take
+2. **Create Animation Sequence**
+   - Use the toolbar buttons in the node graph canvas:
+     - **Joint**: Create a pose node with specific joint angles
+     - **Transition**: Add smooth motion between poses
+     - **AI Agent**: Generate AI-powered poses (optional)
+   - Click nodes to edit joint values using sliders
+   - Connect nodes by dragging from output to input ports
 
-Example `workflow.json` structure:
+3. **Animate and Export**
+   - Click "Run Animation" to preview the sequence in the 3D viewer
+   - Use "Record" to capture joint positions during playback
+   - Click "Export" to download a CSV file with timestamped joint positions
+   - The CSV format: `timestamp,joint1,joint2,joint3,joint4,joint5`
 
-```json
-{
-  "name": "my_custom_workflow",
-  "description": "A custom workflow for LeLamp",
-  "nodes": [
-    {
-      "id": "start",
-      "type": "entry",
-      "action": "greet_user"
-    },
-    {
-      "id": "listen",
-      "type": "action",
-      "action": "listen_for_command"
-    },
-    {
-      "id": "process",
-      "type": "decision",
-      "condition": "has_command",
-      "true_path": "execute",
-      "false_path": "listen"
-    },
-    {
-      "id": "execute",
-      "type": "action",
-      "action": "execute_command"
-    }
-  ],
-  "edges": [
-    {
-      "from": "start",
-      "to": "listen"
-    },
-    {
-      "from": "listen",
-      "to": "process"
-    },
-    {
-      "from": "process",
-      "to": "execute",
-      "condition": "has_command"
-    }
-  ]
-}
+4. **Manual Control**
+   - Select joints from the dropdown in the 3D viewer
+   - Drag sliders or use the 3D manipulator to adjust joint angles
+   - Changes update in real-time on the robot model
+
+## Connecting to Robot Lab
+
+### CSV Export Format
+
+The exported CSV files contain keyframe data that can be consumed by the robot runtime:
+
+```csv
+timestamp,joint1,joint2,joint3,joint4,joint5
+0,0.0,0.0,0.0,0.0,0.0
+20,0.5,0.3,0.2,0.1,0.0
+40,1.0,0.6,0.4,0.2,0.0
+...
 ```
 
-### Step 3: Create `tools.py`
+- **Timestamp**: Milliseconds from animation start
+- **Joint values**: Radian angles for each joint (1-5 for Lelamp)
 
-Create a `tools.py` file that implements the functions referenced in your `workflow.json`. These functions are the actual tools that your workflow can use.
+### Integration Points
 
-Example `tools.py`:
+1. **CSV Import/Export**: The interface can import existing CSV animations and export new ones. Use the exported CSV files with your robot runtime system.
 
-```python
-"""Tools for my_custom_workflow"""
+2. **Joint State Management**: Joint values are managed via Zustand store (`src/store/useJointStore.ts`). This can be extended to send real-time commands to robot hardware via WebSocket or HTTP API.
 
-from typing import Dict, Any
+3. **Runtime Connection** (Future): To connect directly to the robot lab:
+   - Add a WebSocket client in `src/lib/robotRuntime.ts` (create this file)
+   - Subscribe to joint value changes from the store
+   - Send joint commands to the robot runtime endpoint
+   - Implement the RGB service interface mentioned in the codebase
 
-def greet_user(context: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Greets the user with a friendly message and LED animation.
-    
-    Args:
-        context: Workflow context containing state and parameters
-        
-    Returns:
-        Updated context with greeting status
-    """
-    # Your implementation here
-    # Example: Control LEDs, play audio, move servos
-    return {
-        **context,
-        "greeted": True
-    }
+### Example Integration Pattern
 
-def listen_for_command(context: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Listens for user voice commands.
-    
-    Args:
-        context: Workflow context
-        
-    Returns:
-        Updated context with command data
-    """
-    # Your implementation here
-    # Example: Process audio input, use speech recognition
-    return {
-        **context,
-        "command": "example_command",
-        "has_command": True
-    }
+```typescript
+// Example: Send joint values to robot runtime
+import { useJointStore } from '@/store/useJointStore';
 
-def execute_command(context: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Executes the received command.
-    
-    Args:
-        context: Workflow context with command data
-        
-    Returns:
-        Updated context with execution status
-    """
-    command = context.get("command")
-    # Your implementation here
-    # Example: Parse command and trigger appropriate robot actions
-    return {
-        **context,
-        "executed": True
-    }
+const sendToRobot = (jointValues: Record<string, number>) => {
+  fetch('http://robot-lab-ip:port/api/joints', {
+    method: 'POST',
+    body: JSON.stringify(jointValues)
+  });
+};
+
+// Subscribe to joint changes
+useJointStore.subscribe(
+  (state) => state.jointValues,
+  (jointValues) => sendToRobot(jointValues)
+);
 ```
 
-**Important Notes:**
+## Features
 
-- All tool functions must accept a `context: Dict[str, Any]` parameter
-- All tool functions must return a `Dict[str, Any]` (typically an updated context)
-- Use type hints for better code clarity
-- Include docstrings explaining what each function does
-- Import any necessary LeLamp runtime modules at the top of the file
+- ✅ URDF loader with mesh support
+- ✅ Interactive 3D joint manipulation
+- ✅ Node-based animation graph editor
+- ✅ Smooth transition interpolation
+- ✅ Animation recording and CSV export
+- ✅ CSV import for existing animations
+- ✅ AI-powered pose generation (Neocortex integration)
+- ✅ Real-time 3D preview
 
-### Step 4: Upload Your Workflow
+## Tech Stack
 
-Once you've created both files, your workflow folder structure should look like this:
+- **React 18** + **TypeScript**
+- **React Three Fiber** (3D rendering)
+- **React Flow** (node graph editor)
+- **URDF Loader** (robot model parsing)
+- **Zustand** (state management)
+- **Vite** (build tool)
 
-```
-workflows/
-└── my_custom_workflow/
-    ├── workflow.json
-    └── tools.py
-```
+## Project Structure
 
-If you're working on the Raspberry Pi directly, your files are already in place. If you're developing on a separate computer:
+- `src/components/Viewer3D.tsx` - 3D robot visualization
+- `src/components/NodeGraph.tsx` - Animation graph editor
+- `src/store/useJointStore.ts` - Joint state management
+- `src/lib/neocortex.ts` - AI integration (optional)
 
-1. **Commit and push** your workflow to the repository (if using version control)
-2. **Or copy** the folder to the Raspberry Pi using `scp`:
+## Notes
 
-```bash
-scp -r my_custom_workflow your_username@your_host_name.local:~/lelamp_runtime/workflows/
-```
-
-## Running Workflows
-
-To make your workflows available when running the LeLamp agent, you need to specify them using the `WORKFLOWS` environment variable.
-
-### Basic Usage
-
-Run the main workflow script with your workflows enabled:
-
-```bash
-WORKFLOWS=workflow_1,workflow_2 sudo uv run main_workflow.py console
-```
-
-Replace `workflow_1` and `workflow_2` with the actual names of your workflow folders (without the path, just the folder name).
-
-### Example
-
-If you have workflows named `greeting_workflow`, `dance_sequence`, and `interactive_mode`, you would run:
-
-```bash
-WORKFLOWS=greeting_workflow,dance_sequence,interactive_mode sudo uv run main_workflow.py console
-```
-
-### Multiple Workflows
-
-You can specify multiple workflows separated by commas. The system will make all tools from the specified workflows available to the agent:
-
-```bash
-WORKFLOWS=workflow_1,workflow_2,workflow_3 sudo uv run main_workflow.py console
-```
-
-**Note:** Ensure all workflow folder names are correct and exist in the `workflows/` directory. If a workflow name is misspelled or doesn't exist, it will be skipped (check the console output for warnings).
-
-## Workflow Best Practices
-
-### 1. Naming Conventions
-
-- Use descriptive, lowercase names with underscores
-- Keep names concise but clear (e.g., `voice_control`, `dance_routine`, `mood_lighting`)
-- Avoid special characters and spaces
-
-### 2. Error Handling
-
-Always include error handling in your `tools.py` functions:
-
-```python
-def my_tool(context: Dict[str, Any]) -> Dict[str, Any]:
-    try:
-        # Your implementation
-        return {**context, "status": "success"}
-    except Exception as e:
-        return {**context, "status": "error", "error": str(e)}
-```
-
-### 3. Context Management
-
-- Use the context dictionary to pass state between workflow nodes
-- Initialize default values when needed
-- Keep context data minimal and relevant
-
-### 4. Testing
-
-Test your workflows individually before combining them:
-
-```bash
-# Test a single workflow
-WORKFLOWS=my_custom_workflow sudo uv run main_workflow.py console
-```
-
-### 5. Documentation
-
-- Document your workflow's purpose in `workflow.json`
-- Include clear docstrings in all `tools.py` functions
-- Comment complex logic in your code
-
-## Troubleshooting
-
-### Workflow Not Found
-
-If you get an error that a workflow is not found:
-
-1. **Check the folder name** - Ensure it matches exactly (case-sensitive)
-2. **Verify location** - Confirm the folder is in `lelamp_runtime/workflows/`
-3. **Check file names** - Both `workflow.json` and `tools.py` must exist
-
-### Import Errors in `tools.py`
-
-If you encounter import errors:
-
-1. **Check dependencies** - Ensure all imported modules are available in the runtime
-2. **Verify paths** - Use relative imports or absolute imports from the runtime root
-3. **Test imports** - Try importing your tools module directly:
-
-```bash
-cd lelamp_runtime
-sudo uv run python -c "from workflows.my_custom_workflow.tools import greet_user"
-```
-
-### Workflow Execution Errors
-
-If the workflow runs but fails during execution:
-
-1. **Check console output** - Look for error messages in the terminal
-2. **Validate JSON** - Ensure `workflow.json` is valid JSON (use a JSON validator)
-3. **Test tools individually** - Import and test each function in `tools.py` separately
-4. **Check context** - Verify that context data is being passed correctly between nodes
-
-## Example Workflow: Simple Greeting
-
-Here's a complete example of a simple greeting workflow:
-
-**`workflows/greeting_workflow/workflow.json`:**
-```json
-{
-  "name": "greeting_workflow",
-  "description": "A simple workflow that greets users when they approach",
-  "nodes": [
-    {
-      "id": "start",
-      "type": "entry",
-      "action": "detect_presence"
-    },
-    {
-      "id": "greet",
-      "type": "action",
-      "action": "play_greeting"
-    }
-  ],
-  "edges": [
-    {
-      "from": "start",
-      "to": "greet"
-    }
-  ]
-}
-```
-
-**`workflows/greeting_workflow/tools.py`:**
-```python
-"""Tools for greeting_workflow"""
-
-from typing import Dict, Any
-
-def detect_presence(context: Dict[str, Any]) -> Dict[str, Any]:
-    """Detects if a user is present."""
-    # Implementation would use camera or sensors
-    return {**context, "user_present": True}
-
-def play_greeting(context: Dict[str, Any]) -> Dict[str, Any]:
-    """Plays a greeting animation and sound."""
-    # Implementation would control LEDs, servos, and audio
-    return {**context, "greeted": True}
-```
-
-Run it with:
-```bash
-WORKFLOWS=greeting_workflow sudo uv run main_workflow.py console
-```
-
-## Next Steps
-
-- **Explore existing workflows** - Check the `workflows/` folder in the LeLamp runtime repository for examples
-- **Combine workflows** - Use multiple workflows together for complex behaviors
-- **Share your workflows** - Contribute back to the community by sharing your workflow implementations
-- **Read the runtime docs** - Refer to the [LeLamp Runtime repository](https://github.com/humancomputerlab/lelamp_runtime) for advanced features and API documentation
-
----
-
-**Previous**: [LeLamp Control](./5.%20LeLamp%20Control.md) | **Troubleshooting**: [Common Issues](./6.%20Common%20Issues.md)
+- The interface is designed for 5-DOF robots (Lelamp), but can work with any URDF model
+- Joint orientation mapping may need calibration for your specific robot
+- RGB service integration is planned but not yet implemented
+- See `NEOCORTEX_INTEGRATION.md` for AI features documentation
